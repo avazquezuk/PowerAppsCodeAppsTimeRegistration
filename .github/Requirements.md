@@ -207,8 +207,10 @@ Stores employee time entries before and after approval. Based on LSC Time Entry 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | Id | INT | PK, IDENTITY | Auto-increment primary key |
-| EmployeeNo | NVARCHAR(50) | NOT NULL | Office 365 User ID (email) |
+| BCId | UNIQUEIDENTIFIER | NULL | Business Central record GUID (after sync) |
+| EmployeeNo | NVARCHAR(50) | NOT NULL | Office 365 User ID or LS Central employee code |
 | WorkLocation | NVARCHAR(20) | FK → WorkLocations.Code | Location code |
+| WorkRoleCode | NVARCHAR(10) | NULL | Role code during shift |
 | SystemDateEntry | DATE | NOT NULL | System-captured check-in date |
 | SystemTimeEntry | TIME | NOT NULL | System-captured check-in time |
 | SystemDateExit | DATE | NULL | System-captured check-out date |
@@ -219,10 +221,14 @@ Stores employee time entries before and after approval. Based on LSC Time Entry 
 | UserTimeExit | TIME | NULL | Manager-adjusted check-out time |
 | NoOfHours | DECIMAL(10,2) | NULL | Calculated hours worked |
 | Status | NVARCHAR(20) | NOT NULL | Pending/Approved/Synced/SyncFailed |
+| BCStatus | NVARCHAR(20) | NULL | Business Central status (Open/Closed/Processed) |
 | RetryFlag | BIT | DEFAULT 0 | Retry sync for failed entries |
 | SyncErrorMessage | NVARCHAR(500) | NULL | Error details from sync failures |
 | ManagerId | NVARCHAR(50) | NULL | Manager who approved (Office 365 ID) |
 | ApprovalComment | NVARCHAR(500) | NULL | Manager's approval notes |
+| EntryMethod | NVARCHAR(20) | DEFAULT 'Manual Entry' | Entry method |
+| OriginLogon | NVARCHAR(50) | DEFAULT 'PowerApps' | Entry origin |
+| ODataETag | NVARCHAR(100) | NULL | ETag for optimistic concurrency |
 | CreatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Record creation timestamp |
 | UpdatedAt | DATETIME2 | DEFAULT GETUTCDATE() | Last modification timestamp |
 
@@ -245,6 +251,7 @@ Cached work locations synced from LS Central at app startup. Based on LSC Work L
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
+| Id | UNIQUEIDENTIFIER | NULL | Business Central record GUID |
 | Code | NVARCHAR(20) | PK | Location identification code |
 | Description | NVARCHAR(100) | NOT NULL | Location display name |
 | WorkRegion | NVARCHAR(20) | NULL | Work region for sharing |
@@ -253,6 +260,7 @@ Cached work locations synced from LS Central at app startup. Based on LSC Work L
 | Status | NVARCHAR(20) | NOT NULL | Active/Inactive status |
 | GlobalDimension1Code | NVARCHAR(20) | NULL | Dimension for filtering |
 | GlobalDimension2Code | NVARCHAR(20) | NULL | Dimension for filtering |
+| ODataETag | NVARCHAR(100) | NULL | ETag for optimistic concurrency |
 | LastSyncedAt | DATETIME2 | DEFAULT GETUTCDATE() | Last sync from LS Central |
 
 ---
@@ -516,139 +524,239 @@ Cached work locations synced from LS Central at app startup. Based on LSC Work L
 
 **Source Table:** LSC Work Location (Table 10015021)
 
-**Request:**
-```http
-GET /api/worklocations
+**Business Central API Endpoint:**
+```
+GET https://api.businesscentral.dynamics.com/v2.0/{environment}/api/lsretail/timeregistration/v2.0/companies({companyId})/workLocations
 Authorization: Bearer {token}
 ```
+
+**Path Parameters:**
+- `{environment}`: Business Central environment name (e.g., "LoyaltyIntegrationDev")
+- `{companyId}`: Company GUID (e.g., "24f9b5d6-4895-ef11-8a6b-00224840f1d6")
 
 **Response:**
 ```json
 {
-  "succworkRegion": "REGION1",
+  "@odata.context": "https://api.businesscentral.dynamics.com/v2.0/LoyaltyIntegrationDev/api/lsretail/timeregistration/v2.0/$metadata#companies(24f9b5d6-4895-ef11-8a6b-00224840f1d6)/workLocations",
+  "value": [
+    {
+      "@odata.etag": "W/\"JzIwOzE4NDE4MjI0NDQ3MzAzMDA3MjU3MTswMDsn\"",
+      "id": "5e497a32-c284-ef11-9c61-00155ddaf077",
+      "code": "HO",
+      "description": "Head Office",
+      "workRegion": "SOUTH",
+      "storeNo": "HO",
+      "responsiblePerson": "",
+      "status": "Active",
+      "globalDimension1Code": "",
+      "globalDimension2Code": ""
+    },
+    {
+      "@odata.etag": "W/\"JzIwOzE4NDE4MjI0NDQ3MzAzMDA3MjU4MTswMDsn\"",
+      "id": "6f497a32-c284-ef11-9c61-00155ddaf078",
+      "code": "STORE01",
+      "description": "Main Store - Downtown",
+      "workRegion": "NORTH",
       "storeNo": "S001",
       "responsiblePerson": "EMP001",
       "status": "Active",
       "globalDimension1Code": "DEPT1",
       "globalDimension2Code": "AREA1"
-    },
-    {
-      "code": "STORE02",
-      "description": "Branch Store - Uptown",
-      "workRegion": "REGION2",
-      "storeNo": "S002",
-      "responsiblePerson": "EMP002",
-      "status": "Active",
-      "globalDimension1Code": "DEPT2",
-      "globalDimension2Code": "AREA2"
-    },
-    {
-      "code": "STORE02",
-      "description": "Branch Store - Uptown",
-      "status": "Active"
     }
-  ],
-  "timestamp": "2026-01-14T10:30:00Z"
+  ]
+}
+```
+
+**Field Mapping:**
+- `id`: Business Central record GUID (for OData operations)
+- `code`: Location code (primary identifier for app)
+- `description`: Location display name
+- `workRegion`: Geographical/organizational region
+- `storeNo`: Linked retail store number
+- `responsiblePerson`: Manager employee code
+- `status`: "Active" or "Inactive"
+- `globalDimension1Code`: Financial dimension 1
+- `globalDimension2Code`: Financial dimension 2
+
+**OData Features:**
+- `@odata.etag`: Used for optimistic concurrency control
+- `@odata.context`: Metadata reference for response structure
+- Supports OData query parameters: `$filter`, `$select`, `$orderby`, `$top`, `$skip`
+
+**Example with Filtering:**
+```
+GET .../workLocations?$filter=status eq 'Active'&$select=code,description
+```
+
+**Error Response:**
+```json
+{
+  "error": {
+    "code": "BadRequest",
+    "message": "Failed to connect to Business Central"
+  }
+}
+```
+
+### 7.2 GET/POST /api/timeentries
+
+**Purpose:** Read existing time entries and sync approved entries from SQL to LS Central Time Entry Registration
+
+**Target Table:** LSC Time Entry Registration (Table 10015007)
+
+**Business Central API Endpoint:**
+```
+GET https://api.businesscentral.dynamics.com/v2.0/{environment}/api/lsretail/timeregistration/v2.0/companies({companyId})/timeEntryRegistrations
+POST https://api.businesscentral.dynamics.com/v2.0/{environment}/api/lsretail/timeregistration/v2.0/companies({companyId})/timeEntryRegistrations
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+**Path Parameters:**
+- `{environment}`: Business Central environment name (e.g., "LoyaltyIntegrationDev")
+- `{companyId}`: Company GUID (e.g., "24f9b5d6-4895-ef11-8a6b-00224840f1d6")
+
+**GET Response (Read Existing Entries):**
+```json
+{
+  "@odata.context": "https://api.businesscentral.dynamics.com/v2.0/LoyaltyIntegrationDev/api/lsretail/timeregistration/v2.0/$metadata#companies(24f9b5d6-4895-ef11-8a6b-00224840f1d6)/timeEntryRegistrations",
+  "value": [
+    {
+      "@odata.etag": "W/\"JzIwOzE0MzQwNjE5MDQyNzg0NDg3MzE5MTswMDsn\"",
+      "id": "10169496-0dea-f011-8542-7c1e521d7bc9",
+      "employeeNo": "0066",
+      "workLocation": "S0001",
+      "workRoleCode": "CASHIER",
+      "systemDateEntry": "2026-01-05",
+      "systemTimeEntry": "09:07:33.997",
+      "systemDateExit": "2026-01-05",
+      "systemTimeExit": "09:07:45.147",
+      "userDateEntry": "0001-01-01",
+      "userTimeEntry": "00:00:00",
+      "userDateExit": "0001-01-01",
+      "userTimeExit": "00:00:00",
+      "noOfHours": 0.01,
+      "status": "Processed",
+      "entryStatus": "OK",
+      "leavingStatus": "OK",
+      "entryMethod": "Automatic Entry",
+      "entryEmployeeComment": "",
+      "originLogon": "ADMIN",
+      "checkInDateTime": "2026-01-05T09:07:33.997Z",
+      "checkOutDateTime": "2026-01-05T09:07:45.147Z",
+      "durationMinutes": 0.60
+    }
+  ]
+}
+```
+
+**POST Request (Create New Entry):**
+```json
+{
+  "employeeNo": "0066",
+  "workLocation": "S0001",
+  "workRoleCode": "CASHIER",
+  "systemDateEntry": "2026-01-14",
+  "systemTimeEntry": "08:00:00",
+  "systemDateExit": "2026-01-14",
+  "systemTimeExit": "17:00:00",
+  "userDateEntry": "2026-01-14",
+  "userTimeEntry": "08:05:00",
+  "userDateExit": "2026-01-14",
+  "userTimeExit": "17:00:00",
+  "entryEmployeeComment": "Adjusted check-in time",
+  "entryMethod": "Manual Entry",
+  "originLogon": "PowerApps"
+}
+```
+
+**Field Mapping (SQL → Business Central API):**
+
+| SQL Column | BC API Field | Type | Description |
+|------------|--------------|------|-------------|
+| EmployeeNo | employeeNo | string | Employee code (must exist in LS Central) |
+| WorkLocation | workLocation | string | Location code |
+| WorkRoleCode | workRoleCode | string | Role code (optional, default: empty) |
+| SystemDateEntry | systemDateEntry | date | System check-in date (YYYY-MM-DD) |
+| SystemTimeEntry | systemTimeEntry | time | System check-in time (HH:mm:ss.fff) |
+| SystemDateExit | systemDateExit | date | System check-out date (YYYY-MM-DD) |
+| SystemTimeExit | systemTimeExit | time | System check-out time (HH:mm:ss.fff) |
+| UserDateEntry | userDateEntry | date | Manager-adjusted check-in date |
+| UserTimeEntry | userTimeEntry | time | Manager-adjusted check-in time |
+| UserDateExit | userDateExit | date | Manager-adjusted check-out date |
+| UserTimeExit | userTimeExit | time | Manager-adjusted check-out time |
+| ApprovalComment | entryEmployeeComment | string | Manager notes |
+| - | entryMethod | string | "Manual Entry" (set by app) |
+| - | originLogon | string | "PowerApps" (set by app) |
+
+**Business Central Computed Fields (Read-Only):**
+- `id`: GUID assigned by Business Central
+- `noOfHours`: Calculated from entry/exit times (decimal)
+- `checkInDateTime`: Combined systemDateEntry + systemTimeEntry (ISO 8601)
+- `checkOutDateTime`: Combined systemDateExit + systemTimeExit (ISO 8601)
+- `durationMinutes`: Duration in minutes (decimal)
+- `status`: Workflow status ("Open", "Closed", "Processed")
+- `entryStatus`: Schedule validation ("OK", "Early", "Late", "Not Scheduled")
+- `leavingStatus`: Schedule validation ("OK", "Early", "Late", "Not in Schedule")
+- `@odata.etag`: For optimistic concurrency control
+
+**Required Fields for POST:**
+- employeeNo (must exist in LS Central)
+- workLocation (must be valid location code)
+- systemDateEntry
+- systemTimeEntry
+- systemDateExit (if checked out)
+- systemTimeExit (if checked out)
+
+**Optional Fields:**
+- workRoleCode
+- userDateEntry, userTimeEntry, userDateExit, userTimeExit (for manager adjustments)
+- entryEmployeeComment
+
+**POST Response (Success):**
+```json
+{
+  "@odata.context": "https://api.businesscentral.dynamics.com/v2.0/LoyaltyIntegrationDev/api/lsretail/timeregistration/v2.0/$metadata#companies(24f9b5d6-4895-ef11-8a6b-00224840f1d6)/timeEntryRegistrations/$entity",
+  "@odata.etag": "W/\"JzIwOzE0MzQwNjE5MDQyNzg0NDg3MzE5MTswMDsn\"",
+  "id": "10169496-0dea-f011-8542-7c1e521d7bc9",
+  "employeeNo": "0066",
+  "workLocation": "S0001",
+  "workRoleCode": "CASHIER",
+  "systemDateEntry": "2026-01-14",
+  "systemTimeEntry": "08:00:00",
+  "systemDateExit": "2026-01-14",
+  "systemTimeExit": "17:00:00",
+  "noOfHours": 8.92,
+  "status": "Closed",
+  "checkInDateTime": "2026-01-14T08:00:00Z",
+  "checkOutDateTime": "2026-01-14T17:00:00Z",
+  "durationMinutes": 535.20
 }
 ```
 
 **Error Response:**
 ```json
 {
-  "success": false,
-  "errorMessage": "Failed to connect to Business Central",
-  "timestamp": "2026-01-14T10:30:00Z"
+  "error": {
+    "code": "BadRequest",
+    "message": "The field 'employeeNo' must be a valid employee code."
+  }
 }
 ```
 
-### 7.2 POST /api/timeentries
+**Common Error Scenarios:**
+- `400 Bad Request`: Invalid employeeNo or workLocation
+- `401 Unauthorized`: Invalid or expired authentication token
+- `404 Not Found`: Company ID or endpoint not found
+- `409 Conflict`: Duplicate entry (same employee + timestamps)
+- `500 Internal Server Error`: Business Central processing error
 
-**Purpose:** Sync approved time entries from SQL to LS Central Time Entry Registration
-
-**Target Table:** LSC Time Entry Registration (Table 10015007)
-
-**Request:**
-```http
-POST /api/timeentries
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "entries": [
-    {
-      "sqlId": 123,
-      "employeeNo": "user@company.com",
-      "workLocation": "STORE01",
-      "systemDateEntry": "2026-01-14",
-      "systemTimeEntry": "08:00:00",
-      "systemDateExit": "2026-01-14",
-      "systemTimeExit": "17:00:00",
-      "userDateEntry": "2026-01-14",
-      "userTimeEntry": "08:05:00",
-      "userDateExit": "2026-01-14",
-      "userTimeExit": "17:00:00",
-      "noOfHours": 8.92,
-      "managerComment": "Adjusted check-in time"
-    }
-  ]
-}
+**OData Query Options for GET:**
 ```
-
-**Field Mapping (SQL → LS Central):**
-
-| SQL Column | LS Central Field | Description |
-|------------|------------------|-------------|
-| EmployeeNo | Employee No. | Office 365 User ID |
-| WorkLocation | Work Location | Location code |
-| SystemDateEntry | System Date (Entry) | System check-in date |
-| SystemTimeEntry | System Time (Entry) | System check-in time |
-| SystemDateExit | System Date (Exit) | System check-out date |
-| SystemTimeExit | System Time (Exit) | System check-out time |
-| UserDateEntry | User Date (Entry) | Manager-adjusted check-in date |
-| UserTimeEntry | User Time (Entry) | Manager-adjusted check-in time |
-| UserDateExit | User Date (Exit) | Manager-adjusted check-out date |
-| UserTimeExit | User Time (Exit) | Manager-adjusted check-out time |
-| NoOfHours | No. Of Hours | Calculated hours |
-| ApprovalComment | Entry Employee Comment | Manager notes |
-
-**LS Central Fields Set by API:**
-- **Status:** "Closed" (entries already approved by manager)
-- **Entry Method:** "Manual Entry"
-- **Origin (Logon):** "PowerApps Code App"
-- **Sequence:** Auto-generated by LS Central
-- **Work Role Code:** Empty (not tracked in app)
-- **Entry Status:** Empty (not validated)
-- **Leaving Status:** Empty (not validated)
-
-**Response:**
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "sqlId": 123,
-      "success": true,
-      "lsCentralSequence": 789,
-      "message": "Entry created successfully"
-    },
-    {
-      "sqlId": 124,
-      "success": false,
-      "errorMessage": "Employee not found in LS Central",
-      "errorCode": "EMPLOYEE_NOT_FOUND"
-    }
-  ],
-  "timestamp": "2026-01-14T10:30:00Z"
-}
+GET .../timeEntryRegistrations?$filter=employeeNo eq '0066' and systemDateEntry ge 2026-01-01
+GET .../timeEntryRegistrations?$filter=status eq 'Open'
+GET .../timeEntryRegistrations?$orderby=systemDateEntry desc&$top=50
 ```
-
-**Error Codes:**
-- `EMPLOYEE_NOT_FOUND`: Office 365 user ID doesn't match any LS Central employee
-- `LOCATION_INVALID`: Work location code not found or inactive
-- `DUPLICATE_ENTRY`: Entry already exists (based on employee + timestamps)
-- `VALIDATION_ERROR`: Data validation failed (e.g., exit before entry)
-- `CONNECTION_ERROR`: Cannot reach Business Central
-- `AUTHORIZATION_ERROR`: API authentication failed
 
 ---
 
