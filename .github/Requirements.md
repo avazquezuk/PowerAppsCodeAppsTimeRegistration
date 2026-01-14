@@ -198,7 +198,56 @@ flowchart TB
 
 ---
 
-## 4. SQL Database Schema
+## SQL Database Schema
+
+### Database Entity Relationship Diagram
+
+```mermaid
+erDiagram
+    WorkLocations ||--o{ TimeEntries : "has"
+    
+    WorkLocations {
+        UNIQUEIDENTIFIER Id "Business Central GUID"
+        NVARCHAR(20) Code PK "Location code"
+        NVARCHAR(100) Description "Location name"
+        NVARCHAR(20) WorkRegion "Region code"
+        NVARCHAR(10) StoreNo "Store number"
+        NVARCHAR(20) ResponsiblePerson "Manager employee code"
+        NVARCHAR(20) Status "Active/Inactive"
+        NVARCHAR(20) GlobalDimension1Code "Financial dimension"
+        NVARCHAR(20) GlobalDimension2Code "Financial dimension"
+        NVARCHAR(100) ODataETag "Optimistic concurrency"
+        DATETIME2 LastSyncedAt "Last sync timestamp"
+    }
+    
+    TimeEntries {
+        INT Id PK "Auto-increment"
+        UNIQUEIDENTIFIER BCId "Business Central GUID"
+        NVARCHAR(50) EmployeeNo "Office 365 user ID"
+        NVARCHAR(20) WorkLocation FK "Location code"
+        NVARCHAR(10) WorkRoleCode "Role during shift"
+        DATE SystemDateEntry "Check-in date"
+        TIME SystemTimeEntry "Check-in time"
+        DATE SystemDateExit "Check-out date"
+        TIME SystemTimeExit "Check-out time"
+        DATE UserDateEntry "Manager adjusted in date"
+        TIME UserTimeEntry "Manager adjusted in time"
+        DATE UserDateExit "Manager adjusted out date"
+        TIME UserTimeExit "Manager adjusted out time"
+        DECIMAL(10,2) NoOfHours "Calculated hours"
+        NVARCHAR(20) Status "Pending/Approved/Synced/SyncFailed"
+        NVARCHAR(20) BCStatus "BC status"
+        BIT RetryFlag "Retry sync flag"
+        NVARCHAR(500) SyncErrorMessage "Sync error details"
+        NVARCHAR(50) ManagerId "Approving manager"
+        NVARCHAR(500) ApprovalComment "Manager notes"
+        NVARCHAR(20) EntryMethod "Manual Entry"
+        NVARCHAR(50) OriginLogon "PowerApps"
+        NVARCHAR(100) ODataETag "Optimistic concurrency"
+        DATETIME2 CreatedAt "Created timestamp"
+        DATETIME2 UpdatedAt "Updated timestamp"
+    }
+```
 
 ### 4.1 TimeEntries Table
 
