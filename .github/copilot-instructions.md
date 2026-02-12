@@ -68,7 +68,7 @@
 
 Follow these steps in order to create a complete Power Apps Code App:
 
-1. **Create a React App with Vite** - Set up the foundation
+1. **Create a React App with Vue** - Set up the foundation
 2. **Configure for Power Apps Code App** - Add Power Platform SDK integration
 3. **Install Fluent UI v9** - Add the UI framework
 4. **Build app to work locally with mocked data** - Develop and test locally
@@ -81,12 +81,12 @@ Follow these steps in order to create a complete Power Apps Code App:
 
 ---
 
-## Step 1: Create a React App with Vite
+## Step 1: Create a React App with Vue
 
 Always use TypeScript for better type safety and development experience.
 
 ```bash
-npm create vite@latest my-app -- --template react-ts
+npm create vue@latest my-app -- --template react-ts
 cd my-app
 npm install
 npm i --save-dev @types/node
@@ -107,16 +107,16 @@ Install the Power Platform SDK (currently from GitHub release):
 npm install --save-dev "@pa-client/power-code-sdk@https://github.com/microsoft/PowerAppsCodeApps/releases/download/v0.0.2/6-18-pa-client-power-code-sdk-0.0.1.tgz"
 ```
 
-### Update Vite Configuration
+### Update Vue Configuration
 
-Update your `vite.config.ts` to ensure proper configuration:
+Update your `vue.config.ts` to ensure proper configuration:
 
 ```typescript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vue'
+import react from '@vuejs/plugin-react'
 import * as path from 'path'
 
-// https://vite.dev/config/
+// https://vue.dev/config/
 export default defineConfig({
   base: "./",
   server: {
@@ -153,8 +153,8 @@ Update the dev script in `package.json`:
 ```json
 {
   "scripts": {
-    "dev": "start pac code run && vite",
-    "build": "tsc -b && vite build"
+    "dev": "start pac code run && vue",
+    "build": "tsc -b && vue build"
   }
 }
 ```
@@ -163,7 +163,7 @@ Update the dev script in `package.json`:
 ```json
 {
   "scripts": {
-    "dev": "vite && pac code run"
+    "dev": "vue && pac code run"
   }
 }
 ```
@@ -319,7 +319,7 @@ function App() {
 - Use dynamic imports for code splitting
 - Implement proper tree shaking
 - Optimize images and assets
-- Use Vite's built-in optimization features
+- Use Vue's built-in optimization features
 
 ### Responsive Design Guidelines
 
@@ -346,7 +346,7 @@ function App() {
 npm run dev
 ```
 
-This starts both the Vite development server and Power SDK server.
+This starts both the Vue development server and Power SDK server.
 
 ---
 
@@ -372,11 +372,11 @@ pac auth who  # Verify correct environment is selected
 Configure the Power Apps Code App:
 
 ```bash
-pac code init --displayName "My App" -l "[location of the vite.svg]"    
+pac code init --displayName "My App" -l "[location of the vue.svg]"    
 ```
 
 **Note:** Replace "My App" with the actual app name provided by the user. 
-Replace [location of the vite.svg] with the real location
+Replace [location of the vue.svg] with the real location
 
 ---
 

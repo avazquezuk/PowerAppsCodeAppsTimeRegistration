@@ -119,7 +119,7 @@ If any error occurs, it is likely due to the wrong environment. Inform the user 
 npm run dev
 ```
 
-This will start both Vite dev server and PAC Code Run automatically for local development and testing.
+This will start both Vue dev server and PAC Code Run automatically for local development and testing.
 The server will start in a new terminal window, don't look for terminal output. You can assume the app is running in the port 3000. The file power.config.json has the necessary configuration for the Power Apps environment.
 
 ---
@@ -283,14 +283,14 @@ pac code add-data-source -a "shared_customapi" -c <connectionId>
 
 To run code app, the following settings are needed. Use this in case changes cause the app to do not build or run.
 
-`vite.config.ts` proper configuration:
+`vue.config.ts` proper configuration:
 
 ```typescript
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vue'
+import react from '@vuejs/plugin-react'
 import * as path from 'path'
 
-// https://vite.dev/config/
+// https://vue.dev/config/
 export default defineConfig({
   base: "./",
   server: {
@@ -313,8 +313,8 @@ The dev script in `package.json`:
 ```json
 {
   "scripts": {
-    "dev": "start pac code run && vite",
-    "build": "tsc -b && vite build"
+    "dev": "start pac code run && vue",
+    "build": "tsc -b && vue build"
   }
 }
 ```
@@ -323,7 +323,7 @@ The dev script in `package.json`:
 ```json
 {
   "scripts": {
-    "dev": "vite && pac code run"
+    "dev": "vue && pac code run"
   }
 }
 ```
@@ -479,7 +479,7 @@ The user might want to create more examples. Guidance:
 - Use dynamic imports for code splitting
 - Implement proper tree shaking
 - Optimize images and assets
-- Use Vite's built-in optimization features
+- Use Vue's built-in optimization features
 
 ### Responsive Design Guidelines
 
@@ -506,7 +506,7 @@ The user might want to create more examples. Guidance:
 npm run dev
 ```
 
-This starts both the Vite development server and Power SDK server.
+This starts both the Vue development server and Power SDK server.
 
 ---
 
@@ -530,11 +530,11 @@ pac auth who  # Verify correct environment is selected
 Configure the Power Apps Code App:
 
 ```bash
-pac code init --displayName "My App" -l "[location of the vite.svg]"    
+pac code init --displayName "My App" -l "[location of the vue.svg]"    
 ```
 
 **Note:** Replace "My App" with the actual app name provided by the user. 
-Replace [location of the vite.svg] with the real location
+Replace [location of the vue.svg] with the real location
 
 ---
 
